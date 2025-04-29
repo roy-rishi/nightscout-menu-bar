@@ -151,7 +151,7 @@ func (t *Tray) onReady(ctx context.Context) func() { //nolint:gocyclo
 					value := msg.Properties.String(t.config)
 					slog.Debug("Updating reading", "value", value)
 					if t.dynamicIcon == nil {
-						systray.SetTitle(value)
+						systray.SetTitle("testing testing")
 					} else {
 						if icon, err := t.dynamicIcon.Generate(msg.Properties); err == nil {
 							systray.SetTitle("")
