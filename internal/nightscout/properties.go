@@ -1,6 +1,8 @@
 package nightscout
 
 import (
+	"strings"
+
 	"gabe565.com/nightscout-menu-bar/internal/config"
 )
 
@@ -11,15 +13,29 @@ type Properties struct {
 	Direction Direction `json:"direction"`
 }
 
-func (p Properties) String(conf *config.Config) string {
-	result := p.Bgnow.DisplayBg(conf.Units) +
-		" " + p.Bgnow.Arrow(conf.Arrows)
-	if delta := p.Delta.Display(conf.Units); delta != "" {
-		// result += " " + p.Delta.Display(conf.Units) // temporarily remove delta from title
+func (p Properties) String(data config.Data) string {
+	var result strings.Builder
+
+	result.WriteString(p.Bgnow.DisplayBg(data.Units))
+	if !data.LastReading.HideArrow {
+		result.WriteRune(' ')
+		result.WriteString(p.Bgnow.Arrow(data.Arrows))
 	}
-	if rel := p.Bgnow.Mills.Relative(conf.Advanced.RoundAge); rel != "" {
-		// result += " [" + p.Bgnow.Mills.Relative(conf.Advanced.RoundAge) + "]" // temporarily remove age from title
-		// TODO: show age only if age > a constant
+
+	if !data.LastReading.HideDelta {
+		if delta := p.Delta.Display(data.Units); delta != "" {
+			result.WriteRune(' ')
+			result.WriteString(delta)
+		}
 	}
-	return result
+
+	if !data.LastReading.HideTimeAgo {
+		if rel := p.Bgnow.Mills.Relative(data.Advanced.RoundAge); rel != "" {
+			result.WriteString(" [")
+			result.WriteString(rel)
+			result.WriteRune(']')
+		}
+	}
+
+	return result.String()
 }

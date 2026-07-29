@@ -11,12 +11,15 @@ import (
 	flag "github.com/spf13/pflag"
 )
 
-const LocalFileFormatCsv = "csv"
+const SocketFormatCSV = "csv"
 
 func New(opts ...Option) *Config {
-	conf := &Config{
+	data := &Data{
 		Title: "Nightscout",
 		Units: UnitMgdl,
+		LastReading: LastReading{
+			StaleThreshold: Duration{15 * time.Minute},
+		},
 		DynamicIcon: DynamicIcon{
 			Enabled:     true,
 			FontColor:   colorx.Hex{Color: color.White},
@@ -32,9 +35,9 @@ func New(opts ...Option) *Config {
 			DoubleDown:    "⇊",
 			Unknown:       "-",
 		},
-		LocalFile: LocalFile{
-			Format: LocalFileFormatCsv,
-			Path:   filepath.Join("$TMPDIR", "nightscout.csv"),
+		Socket: Socket{
+			Format: SocketFormatCSV,
+			Path:   filepath.Join("$TMPDIR", "nightscout.sock"),
 		},
 		Log: Log{
 			Level:  slogx.LevelInfo,
@@ -49,10 +52,13 @@ func New(opts ...Option) *Config {
 
 	switch runtime.GOOS {
 	case "darwin":
-		conf.DynamicIcon.Enabled = false
+		data.DynamicIcon.Enabled = false
 	case "windows":
-		conf.DynamicIcon.FontColor = colorx.Hex{Color: color.Black}
+		data.DynamicIcon.FontColor = colorx.Hex{Color: color.Black}
 	}
+
+	conf := &Config{}
+	conf.data.Store(data)
 
 	conf.Flags = flag.NewFlagSet("", flag.ContinueOnError)
 	conf.RegisterFlags()

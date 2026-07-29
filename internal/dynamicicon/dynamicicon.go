@@ -5,6 +5,8 @@ import (
 	_ "embed"
 	"errors"
 	"image"
+	"image/color"
+	"image/draw"
 	"log/slog"
 	"os"
 	"path/filepath"
@@ -17,8 +19,8 @@ import (
 	"gabe565.com/nightscout-menu-bar/internal/util"
 	"gabe565.com/utils/bytefmt"
 	"github.com/flopp/go-findfont"
-	"github.com/goki/freetype/truetype"
 	"golang.org/x/image/font"
+	"golang.org/x/image/font/opentype"
 	"golang.org/x/image/math/fixed"
 )
 
@@ -34,7 +36,7 @@ type DynamicIcon struct {
 	config *config.Config
 	mu     sync.Mutex
 
-	font *truetype.Font
+	font *opentype.Font
 }
 
 func New(conf *config.Config) *DynamicIcon {
@@ -47,12 +49,14 @@ func (d *DynamicIcon) Generate(p *nightscout.Properties) ([]byte, error) {
 	d.mu.Lock()
 	defer d.mu.Unlock()
 
+	data := d.config.Data()
+
 	if d.font == nil {
 		var b []byte
-		if d.config.DynamicIcon.FontFile == "" {
+		if data.DynamicIcon.FontFile == "" {
 			b = defaultFont
 		} else {
-			path := util.ResolvePath(d.config.DynamicIcon.FontFile)
+			path := util.ResolvePath(data.DynamicIcon.FontFile)
 
 			if !filepath.IsAbs(path) {
 				dir, err := config.GetDir()
@@ -69,7 +73,7 @@ func (d *DynamicIcon) Generate(p *nightscout.Properties) ([]byte, error) {
 					return nil, err
 				}
 
-				path, findErr := findfont.Find(d.config.DynamicIcon.FontFile)
+				path, findErr := findfont.Find(data.DynamicIcon.FontFile)
 				if findErr != nil {
 					return nil, errors.Join(err, findErr)
 				}
@@ -80,7 +84,7 @@ func (d *DynamicIcon) Generate(p *nightscout.Properties) ([]byte, error) {
 			}
 		}
 
-		f, err := truetype.Parse(b)
+		f, err := opentype.Parse(b)
 		if err != nil {
 			return nil, err
 		}
@@ -89,7 +93,7 @@ func (d *DynamicIcon) Generate(p *nightscout.Properties) ([]byte, error) {
 	}
 
 	start := time.Now()
-	bgnow := p.Bgnow.DisplayBg(d.config.Units)
+	bgnow := p.Bgnow.DisplayBg(data.Units)
 
 	var face font.Face
 	defer func() {
@@ -101,14 +105,19 @@ func (d *DynamicIcon) Generate(p *nightscout.Properties) ([]byte, error) {
 	img := image.NewRGBA(image.Rect(0, 0, width, height))
 	drawer := &font.Drawer{
 		Dst: img,
-		Src: image.NewUniform(d.config.DynamicIcon.FontColor),
+		Src: image.NewUniform(data.DynamicIcon.FontColor),
 	}
 
-	fontSize := d.config.DynamicIcon.MaxFontSize * 2
+	fontSize := data.DynamicIcon.MaxFontSize * 2
 	for {
-		face = truetype.NewFace(d.font, &truetype.Options{
+		var err error
+		if face, err = opentype.NewFace(d.font, &opentype.FaceOptions{
 			Size: fontSize,
-		})
+			DPI:  72,
+		}); err != nil {
+			return nil, err
+		}
+
 		drawer.Face = face
 
 		if textWidth := drawer.MeasureString(bgnow); textWidth <= widthF+fixed.I(2) {
@@ -124,9 +133,18 @@ func (d *DynamicIcon) Generate(p *nightscout.Properties) ([]byte, error) {
 
 	metrics := face.Metrics()
 
-	drawer.Dot.X = (widthF - drawer.MeasureString(bgnow)) / 2
-	drawer.Dot.Y = (heightF + metrics.Ascent - metrics.Descent) / 2
+	readingX := (widthF - drawer.MeasureString(bgnow)) / 2
+	readingY := (heightF + metrics.Ascent - metrics.Descent) / 2
+	drawer.Dot = fixed.Point26_6{X: readingX, Y: readingY}
 	drawer.DrawString(bgnow)
+
+	if time.Since(p.Bgnow.Mills.Time) > data.LastReading.StaleThreshold.Duration {
+		// Strikethrough
+		const thickness = 4
+		y := readingY.Round() - int(float64(metrics.XHeight)/64/2) - thickness/2
+		rect := image.Rect(readingX.Round(), y, int(drawer.Dot.X/64), y+thickness)
+		draw.Draw(img, rect, image.NewUniform(color.Black), image.Point{}, draw.Over)
+	}
 
 	var buf bytes.Buffer
 	buf.Grow(2 * bytefmt.KiB)

@@ -7,6 +7,14 @@ token = ''
 # Blood sugar unit. (one of: mg/dL, mmol/L)
 units = 'mg/dL'
 
+# Disable parts of the menu bar text. Only supported on macOS and Linux.
+[last-reading]
+# Readings older than this duration will be displayed as stale (strikethrough).
+stale-threshold = '15m'
+hide-arrow = false
+hide-delta = false
+hide-time-ago = false
+
 # Makes the tray icon show the current blood sugar reading.
 [dynamic-icon]
 enabled = false
@@ -28,13 +36,13 @@ single-down = '↓'
 double-down = '⇊'
 unknown = '-'
 
-# Enables writing the latest blood sugar to a local temporary file.
-[local-file]
+# Exposes the latest reading to other applications over a local socket.
+[socket]
 enabled = false
 # Local file format. (one of: csv)
 format = 'csv'
-# Local file path. $TMPDIR will be replaced with the current temp directory.
-path = '$TMPDIR/nightscout.csv'
+# File path. $TMPDIR will be replaced with the current temp directory.
+path = '$TMPDIR/nightscout.sock'
 
 # Log configuration
 [log]

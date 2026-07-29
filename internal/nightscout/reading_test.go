@@ -13,7 +13,7 @@ import (
 
 func TestReading_Arrow(t *testing.T) {
 	t.Parallel()
-	defaultArrows := config.New().Arrows
+	defaultArrows := config.New().Data().Arrows
 
 	type fields struct {
 		Mean      json.Number
@@ -104,7 +104,7 @@ func TestReading_String(t *testing.T) {
 				ToMills:   tt.fields.ToMills,
 				Sgvs:      tt.fields.Sgvs,
 			}
-			assert.Equal(t, tt.want, r.String(tt.args.conf))
+			assert.Equal(t, tt.want, r.String(tt.args.conf.Data()))
 		})
 	}
 }
@@ -215,13 +215,13 @@ func TestReading_UnmarshalJSON(t *testing.T) {
 		{
 			"simple",
 			fields{},
-			args{[]byte(fmt.Sprintf(normalReading, now.UnixMilli(), now.UnixMilli()))},
+			args{fmt.Appendf(nil, normalReading, now.UnixMilli(), now.UnixMilli())},
 			require.NoError,
 		},
 		{
 			"low",
 			fields{},
-			args{[]byte(fmt.Sprintf(lowReading, now.UnixMilli()))},
+			args{fmt.Appendf(nil, lowReading, now.UnixMilli())},
 			require.NoError,
 		},
 		{

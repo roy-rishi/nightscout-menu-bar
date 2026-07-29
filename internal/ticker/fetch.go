@@ -12,16 +12,18 @@ import (
 
 func (t *Ticker) beginFetch(ctx context.Context, render chan<- *nightscout.Properties) {
 	go func() {
-		t.fetchTicker = time.NewTicker(time.Millisecond)
+		t.fetchTicker = time.NewTicker(t.config.Data().Advanced.FallbackInterval.Duration)
 		defer t.fetchTicker.Stop()
+
 		for {
+			next := t.Fetch(render)
+			t.fetchTicker.Reset(next)
+			slog.Debug("Scheduled next fetch", "in", next)
+
 			select {
 			case <-ctx.Done():
 				return
 			case <-t.fetchTicker.C:
-				next := t.Fetch(render)
-				t.fetchTicker.Reset(next)
-				slog.Debug("Scheduled next fetch", "in", next)
 			}
 		}
 	}()
@@ -32,23 +34,22 @@ func (t *Ticker) Fetch(render chan<- *nightscout.Properties) time.Duration {
 	if err != nil && !errors.Is(err, fetch.ErrNotModified) {
 		t.bus <- err
 	}
+	data := t.config.Data()
 	if properties != nil {
 		if render != nil {
 			render <- properties
 		}
-		if t.config.LocalFile.Enabled {
-			if err := t.localFile.Write(properties); err != nil {
-				slog.Error("Failed to write local file", "error", err)
-			}
+		if data.Socket.Enabled {
+			t.socket.Write(properties)
 		}
 		if len(properties.Buckets) != 0 {
 			bucket := properties.Buckets[0]
 			lastDiff := bucket.ToMills.Sub(bucket.FromMills.Time)
-			nextRead := properties.Bgnow.Mills.Add(lastDiff + t.config.Advanced.FetchDelay.Duration)
+			nextRead := properties.Bgnow.Mills.Add(lastDiff + data.Advanced.FetchDelay.Duration)
 			if until := time.Until(nextRead); until > 0 {
 				return until
 			}
 		}
 	}
-	return t.config.Advanced.FallbackInterval.Duration
+	return data.Advanced.FallbackInterval.Duration
 }

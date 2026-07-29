@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"math"
 	"strconv"
+	"strings"
 
 	"gabe565.com/nightscout-menu-bar/internal/config"
 )
@@ -18,8 +19,8 @@ type Reading struct {
 	Last      Mgdl        `json:"last"`
 	Mills     Mills       `json:"mills"`
 	Index     json.Number `json:"index,omitempty"`
-	FromMills Mills       `json:"fromMills,omitempty"`
-	ToMills   Mills       `json:"toMills,omitempty"`
+	FromMills Mills       `json:"fromMills"`
+	ToMills   Mills       `json:"toMills"`
 	Sgvs      []SGV       `json:"sgvs"`
 }
 
@@ -49,17 +50,24 @@ func (r *Reading) Arrow(conf config.Arrows) string {
 	return direction
 }
 
-func (r *Reading) String(conf *config.Config) string {
+func (r *Reading) String(data config.Data) string {
 	if r.Last == 0 {
 		return ""
 	}
 
-	result := r.DisplayBg(conf.Units) +
-		" " + r.Arrow(conf.Arrows)
-	if rel := r.Mills.Relative(conf.Advanced.RoundAge); rel != "" {
-		result += " [" + r.Mills.Relative(conf.Advanced.RoundAge) + "]"
+	var result strings.Builder
+
+	result.WriteString(r.DisplayBg(data.Units))
+	result.WriteRune(' ')
+	result.WriteString(r.Arrow(data.Arrows))
+
+	if rel := r.Mills.Relative(data.Advanced.RoundAge); rel != "" {
+		result.WriteString(" [")
+		result.WriteString(rel)
+		result.WriteRune(']')
 	}
-	return result
+
+	return result.String()
 }
 
 func (r *Reading) UnmarshalJSON(bytes []byte) error {

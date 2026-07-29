@@ -7,15 +7,15 @@ import (
 
 	"gabe565.com/nightscout-menu-bar/internal/config"
 	"gabe565.com/nightscout-menu-bar/internal/fetch"
-	"gabe565.com/nightscout-menu-bar/internal/localfile"
+	"gabe565.com/nightscout-menu-bar/internal/socket"
 )
 
 func New(conf *config.Config, updateCh chan<- any) *Ticker {
 	t := &Ticker{
-		config:    conf,
-		fetch:     fetch.NewFetch(conf),
-		localFile: localfile.New(conf),
-		bus:       updateCh,
+		config: conf,
+		fetch:  fetch.NewFetch(conf),
+		socket: socket.New(conf),
+		bus:    updateCh,
 	}
 
 	conf.AddCallback(t.reloadConfig)
@@ -25,9 +25,9 @@ func New(conf *config.Config, updateCh chan<- any) *Ticker {
 type Ticker struct {
 	cancel context.CancelFunc
 
-	config    *config.Config
-	fetch     *fetch.Fetch
-	localFile *localfile.LocalFile
+	config *config.Config
+	fetch  *fetch.Fetch
+	socket *socket.Socket
 
 	fetchTicker  *time.Ticker
 	renderTicker *time.Ticker
@@ -45,7 +45,9 @@ func (t *Ticker) reloadConfig() {
 	if t.renderTicker != nil {
 		t.renderTicker.Reset(time.Millisecond)
 	}
-	t.fetch.Reset()
+	if t.fetch != nil {
+		t.fetch.Reset()
+	}
 	if t.fetchTicker != nil {
 		t.fetchTicker.Reset(time.Millisecond)
 	}
@@ -55,7 +57,7 @@ func (t *Ticker) Close() {
 	if t.cancel != nil {
 		t.cancel()
 	}
-	if err := t.localFile.Cleanup(); err != nil {
-		slog.Error("Failed to cleanup local file", "error", err)
+	if err := t.socket.Close(); err != nil {
+		slog.Error("Failed to cleanup socket", "error", err)
 	}
 }
